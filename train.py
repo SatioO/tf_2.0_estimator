@@ -4,51 +4,48 @@ import numpy as np
 import argparse
 
 # parse arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('--model-dir', type=str,
-                    default='./saved_model', help='model dir')
-parser.add_argument('--batch-size', type=int,
-                    default=32, help='batch size')
-args = parser.parse_args()
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--model-dir', type=str,
+#                     default='./saved_model', help='model dir')
+# parser.add_argument('--batch-size', type=int,
+#                     default=32, help='batch size')
+# args = parser.parse_args()
+
+CSV_COLUMN_NAMES = ['SepalLength', 'SepalWidth',
+                    'PetalLength', 'PetalWidth', 'Species']
+
+train_path = tf.keras.utils.get_file(
+    "iris_training.csv", "https://storage.googleapis.com/download.tensorflow.org/data/iris_training.csv")
+test_path = tf.keras.utils.get_file(
+    "iris_test.csv", "https://storage.googleapis.com/download.tensorflow.org/data/iris_test.csv")
+
+train = pd.read_csv(train_path, names=CSV_COLUMN_NAMES, header=0)
+test = pd.read_csv(test_path, names=CSV_COLUMN_NAMES, header=0)
+
+train_y = train.pop('Species')
+test_y = test.pop('Species')
+
+feature_columns = []
+
+for column in train.columns:
+    feature_columns.append(tf.feature_column.numeric_column(key=column))
+
+estimator = tf.estimator.DNNClassifier(
+    feature_columns=feature_columns,
+    n_classes=3,
+    hidden_units=[30, 10]
+)
 
 
-class Model(object):
-    def __init__(self, batch_size):
-        self.batch_size = batch_size
+def input_fn(features, labels, training=True, batch_size=256):
+     # Convert the inputs to a Dataset.
+    dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
 
-    def input_fn(self):
-        pass
+    # Shuffle and repeat if you are in training mode.
+    if training:
+        dataset = dataset.shuffle(1000).repeat()
 
-    def model_fn(self, features, labels, mode):
-        if (mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL):
-            loss = None
-        else:
-            loss = None
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            train_op = None
-        else:
-            train_op = None
-        if mode == tf.estimator.ModeKeys.PREDICT:
-            predictions = None
-        else:
-            predictions = None
-
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions=predictions,
-            loss=loss,
-            train_op=train_op)
+    return dataset.batch(batch_size)
 
 
-def main():
-    # init model class
-    model = Model(args.batch_size)
-    # create classifier
-    classifier = tf.estimator.Estimator(
-        model_dir=args.model_dir, model_fn=model.model_fn)
-
-    classifier.train(input_fn=model.input_fn)
-
-
-if __name__ == "__main__":
-    main()
+estimator.train(input_fn=lambda: input_fn(train, train_y))
