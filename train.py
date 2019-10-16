@@ -3,14 +3,6 @@ import tensorflow as tf
 import numpy as np
 import argparse
 
-# parse arguments
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--model-dir', type=str,
-#                     default='./saved_model', help='model dir')
-# parser.add_argument('--batch-size', type=int,
-#                     default=32, help='batch size')
-# args = parser.parse_args()
-
 CSV_COLUMN_NAMES = ['SepalLength', 'SepalWidth',
                     'PetalLength', 'PetalWidth', 'Species']
 
@@ -25,22 +17,15 @@ test = pd.read_csv(test_path, names=CSV_COLUMN_NAMES, header=0)
 train_y = train.pop('Species')
 test_y = test.pop('Species')
 
+# Preprocessing
 feature_columns = []
-
 for column in train.columns:
     feature_columns.append(tf.feature_column.numeric_column(key=column))
 
-estimator = tf.estimator.DNNClassifier(
-    feature_columns=feature_columns,
-    n_classes=3,
-    hidden_units=[30, 10]
-)
 
-
-def input_fn(features, labels, training=True, batch_size=256):
-     # Convert the inputs to a Dataset.
+def input_fn(features, labels, training=False, batch_size=256):
+    # Convert the inputs to a Dataset.
     dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
-
     # Shuffle and repeat if you are in training mode.
     if training:
         dataset = dataset.shuffle(1000).repeat()
@@ -48,4 +33,19 @@ def input_fn(features, labels, training=True, batch_size=256):
     return dataset.batch(batch_size)
 
 
-estimator.train(input_fn=lambda: input_fn(train, train_y))
+estimator = tf.estimator.DNNClassifier(
+    feature_columns=feature_columns,
+    n_classes=3,
+    hidden_units=[30, 10]
+)
+
+# Train the Model.
+estimator.train(
+    input_fn=lambda: input_fn(train, train_y, training=True),
+    steps=5000)
+
+# Evaluate the Model
+eval_result = estimator.evaluate(
+    input_fn=lambda: input_fn(test, test_y))
+
+print('\nTest set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
