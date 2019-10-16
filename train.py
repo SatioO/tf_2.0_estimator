@@ -17,20 +17,23 @@ test = pd.read_csv(test_path, names=CSV_COLUMN_NAMES, header=0)
 train_y = train.pop('Species')
 test_y = test.pop('Species')
 
-# Preprocessing
+# Feature Engineering for the Model
 feature_columns = []
 for column in train.columns:
     feature_columns.append(tf.feature_column.numeric_column(key=column))
 
 
-def input_fn(features, labels, training=False, batch_size=256):
-    # Convert the inputs to a Dataset.
-    dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
-    # Shuffle and repeat if you are in training mode.
-    if training:
-        dataset = dataset.shuffle(1000).repeat()
+def make_input_fn(features, labels, training=False, batch_size=256):
+    def input_fn():
+        # Convert the inputs to a Dataset.
+        dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
+        # Shuffle and repeat if you are in training mode.
+        if training:
+            dataset = dataset.shuffle(1000).repeat()
 
-    return dataset.batch(batch_size)
+        return dataset.batch(batch_size)
+
+    return input_fn
 
 
 estimator = tf.estimator.DNNClassifier(
@@ -39,13 +42,12 @@ estimator = tf.estimator.DNNClassifier(
     hidden_units=[30, 10]
 )
 
-# Train the Model.
-estimator.train(
-    input_fn=lambda: input_fn(train, train_y, training=True),
-    steps=5000)
+train_input_fn = make_input_fn(train, train_y, training=True)
+eval_input_fn = make_input_fn(test, test_y)
 
+# Train the Model.
+estimator.train(input_fn=train_input_fn, steps=5000)
 # Evaluate the Model
-eval_result = estimator.evaluate(
-    input_fn=lambda: input_fn(test, test_y))
+eval_result = estimator.evaluate(input_fn=eval_input_fn)
 
 print('\nTest set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
